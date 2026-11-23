@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#1f4e79" />
+  <title>SBUI & İKY Ders Planlayıcı</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    :root {
+      --bg: #f4f6fb;
+      --card: #ffffff;
+      --text: #162033;
+      --muted: #5c6b84;
+      --primary: #1f4e79;
+      --accent: #0f766e;
+      --border: #dce3ef;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 16px;
+    }
+    .container { max-width: 960px; margin: 0 auto; }
+    .header {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      margin-bottom: 14px;
+    }
+    .header h1 { margin: 0 0 6px; font-size: 1.3rem; color: var(--primary); }
+    .sub { margin: 0; color: var(--muted); font-size: 0.9rem; line-height: 1.4; }
+    .days { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+    .day-btn {
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      padding: 10px 13px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    .day-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+      gap: 14px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 0.76rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 999px;
+      margin-bottom: 8px;
+      background: #e6f0fa;
+      color: var(--primary);
+    }
+    .badge.iky { background: #e3f5f3; color: var(--accent); }
+    h2 { margin: 0 0 6px; font-size: 1.05rem; }
+    p { margin: 0 0 10px; color: var(--muted); font-size: 0.9rem; line-height: 1.4; }
+    .tool-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .file-label, .mini-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      padding: 7px 11px;
+      border-radius: 8px;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: #f8fafd;
+      color: var(--text);
+    }
+    .mini-btn.summary {
+      background: #e6f0fa;
+      color: var(--primary);
+      border-color: #c5dcf3;
+    }
+    input[type="file"] { display: none; }
+    .status { font-size: 0.78rem; color: var(--accent); margin-bottom: 8px; min-height: 16px; }
+    textarea {
+      width: 100%;
+      min-height: 130px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      font-family: inherit;
+      font-size: 0.9rem;
+      line-height: 1.45;
+      resize: vertical;
+    }
+    .timer-box {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .time { font-size: 1.9rem; font-weight: 800; color: var(--primary); font-variant-numeric: tabular-nums; }
+    .controls { display: flex; gap: 8px; flex-wrap: wrap; }
+    button.action {
+      border: none;
+      background: var(--primary);
+      color: #fff;
+      padding: 10px 13px;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button.action.secondary { background: #e9eff7; color: var(--text); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>SBUI & İKY Haftalık Ders Planlayıcı</h1>
+      <p class="sub">Başlangıç: <strong>23 Kasım 2026 Pazartesi, 20:00</strong> • Android & iPad uyumlu • Dosya yükle (PDF/TXT) ve özet çıkar</p>
+    </div>
+
+    <div class="days" id="dayTabs"></div>
+
+    <div class="card" style="margin-bottom: 14px;">
+      <div class="timer-box">
+        <div>
+          <div style="font-size:0.8rem;color:var(--muted);font-weight:600;">ÇALIŞMA ZAMANLAYICISI (40 DK)</div>
+          <div class="time" id="timerDisplay">40:00</div>
+        </div>
+        <div class="controls">
+          <button class="action" id="startBtn">Başlat / Duraklat</button>
+          <button class="action secondary" id="resetBtn">Sıfırla</button>
+          <button class="action secondary" id="breakBtn">10 dk Mola</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid" id="lessonsGrid"></div>
+  </div>
+
+  <script>
+    if (window.pdfjsLib) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    }
+
+    const planData = [
+      {
+        day: "Pazartesi (23 Kas)",
+        time: "20:00 – 21:30",
+        lessons: [
+          { tag: "SBUI", name: "Türk Siyasal Hayatı", focus: "Gündüz ders notları ve temel kavram/tarih özeti" },
+          { tag: "SBUI", name: "Ortadoğu Siyaseti", focus: "Bölgesel aktörler, gündem ve temel not düzeni" }
+        ]
+      },
+      {
+        day: "Salı",
+        time: "19:30 – 21:00",
+        lessons: [
+          { tag: "SBUI", name: "Theory of International Relations", focus: "Kuram okumaları ve İngilizce kavram özeti" },
+          { tag: "İKY", name: "İşletme Yönetimi", focus: "Temel yönetim işlevleri ve ünite notları" }
+        ]
+      },
+      {
+        day: "Çarşamba",
+        time: "19:30 – 21:00",
+        lessons: [
+          { tag: "İKY", name: "Genel İktisat", focus: "Temel iktisat kavramları ve ünite okuması" },
+          { tag: "SBUI", name: "Uluslararası İlişkiler Tarihi", focus: "Tarihsel bağlam, dönemler ve okuma özeti" }
+        ]
+      },
+      {
+        day: "Perşembe",
+        time: "19:30 – 21:00",
+        lessons: [
+          { tag: "SBUI", name: "Uluslararası Hukukta Güncel Konu ve Tartışmalar", focus: "Hukuki çerçeve, güncel vakalar ve ders notu tekrarı" },
+          { tag: "İKY", name: "Çalışma Sosyolojisi", focus: "Çalışma hayatı kavramları ve ünite okuması" }
+        ]
+      },
+      {
+        day: "Cuma",
+        time: "19:30 – 21:00",
+        lessons: [
+          { tag: "SBUI", name: "Uluslararası Güvenlik Teorileri ve Analizi", focus: "Güvenlik yaklaşımları ve kuram karşılaştırması" },
+          { tag: "İKY", name: "Bilimsel Araştırmalar Tekniği", focus: "Araştırma yöntemleri, desenler ve özet notlar" }
+        ]
+      },
+      {
+        day: "Cumartesi",
+        time: "11:00 – 13:00",
+        lessons: [
+          { tag: "SBUI", name: "Haftalık Kuram & Okuma Tekrarı", focus: "Eksik kalan okumaların ve notların tamamlanması" },
+          { tag: "İKY", name: "Haftalık Ünite & Kavram Tekrarı", focus: "Haftanın üniteleri ve kavram tekrarları" }
+        ]
+      },
+      {
+        day: "Pazar",
+        time: "11:00 – 13:00",
+        lessons: [
+          { tag: "İKY", name: "Soru Çözümü & Deneme", focus: "Ünite sonu ve çıkmış/deneme soru pratiği" },
+          { tag: "SBUI", name: "Vize/Final Soru & Not Toparlama", focus: "Haftalık toparlama ve yeni haftaya hazırlık" }
+        ]
+      }
+    ];
+
+    let activeDayIndex = 0;
+    const rawTexts = {};
+    const dayTabsEl = document.getElementById("dayTabs");
+    const lessonsGridEl = document.getElementById("lessonsGrid");
+
+    function getKey(dayIdx, lessonIdx) {
+      return `sbui_iky_note_${dayIdx}_${lessonIdx}`;
+    }
+
+    function summarizeText(text) {
+      const clean = text.replace(/\s+/g, " ").trim();
+      if (!clean || clean.length < 40) {
+        return "Özet çıkarmak için önce dosya yükleyin veya not alanına en az birkaç cümle metin yapıştırın.";
+      }
+      const stopWords = new Set(["ve", "veya", "ile", "bir", "bu", "şu", "o", "da", "de", "için", "gibi", "olarak", "daha", "en", "çok", "her", "kadar", "olan", "olanlar", "üzere", "ancak", "fakat", "ama", "ise", "the", "and", "of", "to", "in", "is", "for", "that", "with", "as", "on"]);
+      const words = clean.toLowerCase().replace(/[^a-zçğıöşü0-9\s]/gi, " ").split(/\s+/);
+      const freq = {};
+      words.forEach(w => {
+        if (w.length > 3 && !stopWords.has(w)) freq[w] = (freq[w] || 0) + 1;
+      });
+
+      const keywords = Object.entries(freq)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 6)
+        .map(x => x[0]);
+
+      const sentences = clean.split(/(?<=[.!?])\s+/).filter(s => s.length > 25 && s.length < 320);
+      const scored = sentences.map((s, idx) => {
+        const sWords = s.toLowerCase().split(/\s+/);
+        let score = sWords.reduce((acc, w) => acc + (freq[w.replace(/[^a-zçğıöşü0-9]/gi, "")] || 0), 0) / Math.sqrt(sWords.length);
+        if (idx === 0) score *= 1.25;
+        return { s, idx, score };
+      });
+
+      const topSentences = scored
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5)
+        .sort((a, b) => a.idx - b.idx)
+        .map(x => "• " + x.s.trim());
+
+      return `📌 ÖNE ÇIKAN KAVRAMLAR:\n${keywords.join(", ") || "Belirlenemedi"}\n\n📝 ÖZET MADDELER:\n${topSentences.join("\n")}`;
+    }
+
+    async function extractFileText(file) {
+      if (file.name.toLowerCase().endsWith(".pdf") && window.pdfjsLib) {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        let fullText = "";
+        const maxPages = Math.min(pdf.numPages, 25);
+        for (let p = 1; p <= maxPages; p++) {
+          const page = await pdf.getPage(p);
+          const content = await page.getTextContent();
+          fullText += content.items.map(i => i.str).join(" ") + "\n";
+        }
+        return fullText;
+      }
+      return await file.text();
+    }
+
+    function renderTabs() {
+      dayTabsEl.innerHTML = "";
+      planData.forEach((item, idx) => {
+        const btn = document.createElement("button");
+        btn.className = "day-btn" + (idx === activeDayIndex ? " active" : "");
+        btn.textContent = item.day;
+        btn.onclick = () => {
+          activeDayIndex = idx;
+          renderTabs();
+          renderLessons();
+        };
+        dayTabsEl.appendChild(btn);
+      });
+    }
+
+    function renderLessons() {
+      const dayObj = planData[activeDayIndex];
+      lessonsGridEl.innerHTML = "";
+      dayObj.lessons.forEach((lesson, lIdx) => {
+        const key = getKey(activeDayIndex, lIdx);
+        const card = document.createElement("div");
+        card.className = "card";
+        const isIky = lesson.tag === "İKY";
+
+        card.innerHTML = `
+          <span class="badge ${isIky ? "iky" : ""}">${lesson.tag} • ${dayObj.time}</span>
+          <h2>${lesson.name}</h2>
+          <p>${lesson.focus}</p>
+          <div class="tool-row">
+            <label class="file-label">📄 Dosya Ekle (PDF/TXT)<input type="file" accept=".pdf,.txt,.md,.csv" /></label>
+            <button type="button" class="mini-btn summary">✨ Özet Çıkar</button>
+          </div>
+          <div class="status"></div>
+          <textarea placeholder="Ders notunu yaz, metin yapıştır veya dosya yükleyip 'Özet Çıkar'a dokun..."></textarea>
+        `;
+
+        const fileInput = card.querySelector('input[type="file"]');
+        const summaryBtn = card.querySelector('.mini-btn.summary');
+        const statusEl = card.querySelector('.status');
+        const ta = card.querySelector('textarea');
+
+        ta.value = localStorage.getItem(key) || "";
+        ta.addEventListener("input", () => localStorage.setItem(key, ta.value));
+
+        fileInput.addEventListener("change", async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          statusEl.textContent = `"${file.name}" okunuyor...`;
+          try {
+            const text = await extractFileText(file);
+            rawTexts[key] = text;
+            const summary = summarizeText(text);
+            ta.value = (ta.value ? ta.value + "\n\n---\n" : "") + `[${file.name}]\n` + summary;
+            localStorage.setItem(key, ta.value);
+            statusEl.textContent = `"${file.name}" yüklendi ve özetlendi.`;
+          } catch (err) {
+            statusEl.textContent = "Dosya okunamadı. Metni doğrudan yapıştırıp Özet Çıkar'a basabilirsiniz.";
+          }
+        });
+
+        summaryBtn.addEventListener("click", () => {
+          const sourceText = rawTexts[key] || ta.value;
+          const summary = summarizeText(sourceText);
+          if (summary.startsWith("Özet çıkarmak")) {
+            statusEl.textContent = summary;
+            return;
+          }
+          ta.value = summary + (ta.value ? "\n\n--- Önceki Notlar ---\n" + ta.value : "");
+          localStorage.setItem(key, ta.value);
+          statusEl.textContent = "Özet oluşturuldu ve kaydedildi.";
+        });
+
+        lessonsGridEl.appendChild(card);
+      });
+    }
+
+    let secondsLeft = 40 * 60;
+    let intervalId = null;
+    const timerDisplay = document.getElementById("timerDisplay");
+
+    function updateTimerDisplay() {
+      const m = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
+      const s = String(secondsLeft % 60).padStart(2, "0");
+      timerDisplay.textContent = `${m}:${s}`;
+    }
+
+    document.getElementById("startBtn").onclick = () => {
+      if (intervalId) { clearInterval(intervalId); intervalId = null; return; }
+      intervalId = setInterval(() => {
+        if (secondsLeft > 0) { secondsLeft--; updateTimerDisplay(); }
+        else { clearInterval(intervalId); intervalId = null; alert("Çalışma süresi tamamlandı!"); }
+      }, 1000);
+    };
+    document.getElementById("resetBtn").onclick = () => { clearInterval(intervalId); intervalId = null; secondsLeft = 40 * 60; updateTimerDisplay(); };
+    document.getElementById("breakBtn").onclick = () => { clearInterval(intervalId); intervalId = null; secondsLeft = 10 * 60; updateTimerDisplay(); };
+
+    renderTabs();
+    renderLessons();
+    updateTimerDisplay();
+  </script>
+</body>
+</html>
